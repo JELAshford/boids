@@ -62,7 +62,7 @@ fn population_step(boid_pop: Vec<Boid>, obs_range: f32, vel_limit: f32, cohesion
 fn main() {
 
     let mut rng: ThreadRng = rand::thread_rng();
-    const NUM_BOIDS: usize = 10000;
+    const NUM_BOIDS: usize = 1000;
     const VELOCITY_LIMIT: f32 = 10.;
 
     let mut cohesion_val = 10.;
@@ -80,9 +80,11 @@ fn main() {
         .build();
 
     // Run display loop
+    rl.set_target_fps(60);
     while !rl.window_should_close() {
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
+        d.draw_fps(0, 0);
 
         boids = population_step(boids, observation_range, VELOCITY_LIMIT, cohesion_val, separation_val, alignment_val);
 
@@ -110,6 +112,6 @@ fn main() {
             boids = setup_random_boids(NUM_BOIDS, &mut rng);
         }
 
-        thread::sleep(time::Duration::from_millis(10));
+        // thread::sleep(time::Duration::from_millis(10));
     }
 }
