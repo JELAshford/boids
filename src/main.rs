@@ -4,35 +4,9 @@ use raylib::prelude::*;
 use rand::prelude::*;
 
 #[derive(Debug, Default, Clone, PartialEq)]
-struct Vec2 {
-    x: f32,
-    y: f32
-}
-impl Vec2 {
-    fn add(self, other_vec: Vec2) -> Self {
-        Self { x: self.x + other_vec.x, y: self.y + other_vec.y}
-    }
-    fn sub(self, other_vec: Vec2) -> Self {
-        Self { x: self.x - other_vec.x, y: self.y - other_vec.y}
-    }
-    fn div(self, value: f32) -> Self {
-        Self { x: self.x / value, y: self.y / value}
-    }
-    fn max_filter(self, max_value: f32) -> Self {
-        Self { x: self.x.min(max_value), y: self.y.min(max_value)}
-    }
-    fn random(rng_obj: &mut ThreadRng, scale_factor: f32, offset: f32) -> Self {
-        Self { x: (rng_obj.gen::<f32>() * scale_factor) + offset, y: (rng_obj.gen::<f32>() * scale_factor) + offset } 
-    }
-    fn modulus(self, mod_val: f32) -> Self {
-        Self { x: self.x % mod_val, y: self.y % mod_val }
-    }
-}
-
-#[derive(Debug, Default, Clone, PartialEq)]
 struct Boid {
-    pos: Vec2,
-    vel: Vec2,
+    pos: Vector2,
+    vel: Vector2,
 }
 
 
@@ -41,8 +15,8 @@ fn setup_random_boids(num_boids: usize, rng_obj: &mut ThreadRng) -> Vec<Boid> {
     for _ in 0..boids.capacity() {
         boids.push(
             Boid {
-                pos: Vec2::random(rng_obj, 600., 0.), 
-                vel: Vec2::random(rng_obj, 10., -5.) 
+                pos: Vector2::from(rng_obj.gen::<(f32, f32)>()) * 600., 
+                vel: (Vector2::from(rng_obj.gen::<(f32, f32)>()) * 10.) - 5.
             }
         );
     }
@@ -55,9 +29,9 @@ fn population_step(boid_pop: Vec<Boid>, obs_range: f32, vel_limit: f32, cohesion
     for (i1, b1) in boid_pop.iter().enumerate() {
         // Store accumulators for neighbour behaviour 
         let mut num_neighbours: f32 = 0.;
-        let mut neighbour_centre_of_mass: Vec2 = Vec2::default();
-        let mut neighbour_displacements: Vec2 = Vec2::default();
-        let mut neighbour_velocities: Vec2 = Vec2::default();
+        let mut neighbour_centre_of_mass: Vector2 = Vector2::zero();
+        let mut neighbour_displacements: Vector2 = Vector2::zero();
+        let mut neighbour_velocities: Vector2 = Vector2::zero();
 
         // Iterate over all other boid_pop 
         for b2 in &boid_pop {
@@ -65,28 +39,26 @@ fn population_step(boid_pop: Vec<Boid>, obs_range: f32, vel_limit: f32, cohesion
                 let distance = f32::powf(f32::powf(b2.pos.x - b1.pos.x, 2.) + f32::powf(b2.pos.y - b1.pos.y, 2.), 0.5);
                 if distance < obs_range {
                     num_neighbours += 1.;
-                    neighbour_centre_of_mass = neighbour_centre_of_mass.add(b2.pos.clone()); // Cohesion
-                    neighbour_displacements = neighbour_displacements.sub(b2.pos.clone().sub(b1.pos.clone())); // Separation 
-                    neighbour_velocities = neighbour_velocities.add(b2.vel.clone()); // Alignment 
+                    neighbour_centre_of_mass = neighbour_centre_of_mass + b2.pos.clone(); // Cohesion
+                    neighbour_displacements = neighbour_displacements - (b2.pos.clone() - b1.pos.clone()); // Separation 
+                    neighbour_velocities = neighbour_velocities + b2.vel.clone(); // Alignment 
                 }
             }
         }
         
         // Update velocity
         if num_neighbours > 0. {
-            // let v1: Vec2 = neighbour_centre_of_mass.div(num_neighbours).sub(b1.pos.clone()).div(10.); // Cohesion
-            // let v2: Vec2 = neighbour_displacements.div(50.); // Separation 
-            // let v3: Vec2 = neighbour_velocities.div(num_neighbours).sub(b1.vel.clone()).div(1.); // Alignment 
-            let v1: Vec2 = neighbour_centre_of_mass.div(num_neighbours).sub(b1.pos.clone()).div(cohesion); // Cohesion
-            let v2: Vec2 = neighbour_displacements.div(separation); // Separation 
-            let v3: Vec2 = neighbour_velocities.div(num_neighbours).sub(b1.vel.clone()).div(alignment); // Alignment 
-            new_boids[i1].vel = new_boids[i1].vel.clone().add(v1).add(v2).add(v3);
-            new_boids[i1].vel = new_boids[i1].vel.clone().max_filter(vel_limit);
+            let v1: Vector2 = ((neighbour_centre_of_mass/num_neighbours) - b1.pos.clone()) / cohesion; // Cohesion
+            let v2: Vector2 = neighbour_displacements/separation; // Separation 
+            let v3: Vector2 = ((neighbour_velocities/num_neighbours) - b1.vel.clone()) / alignment; // Alignment 
+            new_boids[i1].vel = new_boids[i1].vel.clone() + v1 + v2 + v3;
+            new_boids[i1].vel = new_boids[i1].vel.clone().clamp(-vel_limit, vel_limit);
         }
         
         // Update positions
-        new_boids[i1].pos = new_boids[i1].pos.clone().add(new_boids[i1].vel.clone());
-        new_boids[i1].pos = new_boids[i1].pos.clone().modulus(600.);
+        new_boids[i1].pos = new_boids[i1].pos.clone() + new_boids[i1].vel.clone();
+        new_boids[i1].pos.x = new_boids[i1].pos.clone().x%600.;
+        new_boids[i1].pos.y = new_boids[i1].pos.clone().y%600.;
     };
     new_boids
 }
