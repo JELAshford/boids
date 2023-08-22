@@ -1,3 +1,4 @@
+// https://people.ece.cornell.edu/land/courses/ece4760/labs/s2021/Boids/Boids.html
 // https://vergenet.net/~conrad/boids/pseudocode.html
 use raylib::prelude::*;
 use rand::prelude::*;
@@ -105,16 +106,16 @@ fn main() {
     let mut params = SimulationParameters{
         width: 600., 
         height: 600.,
-        num_boids: 100, 
+        num_boids: 500, 
         speed_max: 5., 
         speed_min: 1., 
-        visual_range: 200., 
-        protected_range: 20., 
-        cohesion_factor: 0.0005, 
-        alignment_factor: 0.05, 
-        separation_factor: 0.05,
-        turn_factor: 0.2,
-        show_ranges: true
+        visual_range: 50., 
+        protected_range: 10., 
+        cohesion_factor: 0.0001, 
+        alignment_factor: 0.02, 
+        separation_factor: 0.01,
+        turn_factor: 0.05,
+        show_ranges: false
     };
 
     // Create boid population
