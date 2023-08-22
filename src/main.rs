@@ -1,5 +1,4 @@
 // https://vergenet.net/~conrad/boids/pseudocode.html
-use std::{thread, time};
 use raylib::prelude::*;
 use rand::prelude::*;
 
@@ -62,16 +61,15 @@ fn population_step(boid_pop: Vec<Boid>, obs_range: f32, vel_limit: f32, cohesion
 fn main() {
 
     let mut rng: ThreadRng = rand::thread_rng();
-    const NUM_BOIDS: usize = 1000;
-    const VELOCITY_LIMIT: f32 = 10.;
-
+    let num_boids = 1000;
+    let velocity_limit = 10.;
     let mut cohesion_val = 10.;
     let mut separation_val = 50.;
     let mut alignment_val = 1.;
     let mut observation_range = 20.;
 
     // Create boid population
-    let mut boids = setup_random_boids(NUM_BOIDS, &mut rng);
+    let mut boids = setup_random_boids(num_boids, &mut rng);
     
     // Setup raylib window
     let (mut rl, thread) = raylib::init()
@@ -86,7 +84,7 @@ fn main() {
         d.clear_background(Color::BLACK);
         d.draw_fps(0, 0);
 
-        boids = population_step(boids, observation_range, VELOCITY_LIMIT, cohesion_val, separation_val, alignment_val);
+        boids = population_step(boids, observation_range, velocity_limit, cohesion_val, separation_val, alignment_val);
 
         for b in &boids {
             d.draw_circle_lines(b.pos.x as i32, b.pos.y as i32, observation_range, Color::SKYBLUE);
@@ -95,23 +93,18 @@ fn main() {
             d.draw_circle(b.pos.x as i32, b.pos.y as i32, 5., Color::BLUE);
         }
 
-
         // User Interface
-        let should_quit = d.gui_button(Rectangle::new(20., 10., 100., 20.), Some(rstr!("Quit")));
-        if should_quit {
-            break;
-        }
-
-        cohesion_val = d.gui_slider(Rectangle::new(20., 30., 200., 20.), Some(rstr!("Low")), Some(rstr!("High")), cohesion_val, 0., 100.);
-        separation_val = d.gui_slider(Rectangle::new(20., 50., 200., 20.), Some(rstr!("Low")), Some(rstr!("High")), separation_val, 0., 100.);
-        alignment_val = d.gui_slider(Rectangle::new(20., 70., 200., 20.), Some(rstr!("Low")), Some(rstr!("High")), alignment_val, 0., 1.);
-        observation_range = d.gui_slider(Rectangle::new(20., 90., 200., 20.), Some(rstr!("Low")), Some(rstr!("High")), observation_range, 0., 100.);
-
-        let should_reset = d.gui_button(Rectangle::new(120., 10., 100., 20.), Some(rstr!("Reset")));
+        let should_quit = d.gui_button(Rectangle::new(0., 20., 100., 20.), Some(rstr!("Quit")));
+        if should_quit { break };
+    
+        let should_reset = d.gui_button(Rectangle::new(100., 20., 100., 20.), Some(rstr!("Reset")));
         if should_reset {
-            boids = setup_random_boids(NUM_BOIDS, &mut rng);
+            boids = setup_random_boids(num_boids, &mut rng);
         }
 
-        // thread::sleep(time::Duration::from_millis(10));
+        cohesion_val = d.gui_slider(Rectangle::new(0., 40., 200., 20.), Some(rstr!("")), Some(rstr!("Cohesion")), cohesion_val, 0., 100.);
+        separation_val = d.gui_slider(Rectangle::new(0., 60., 200., 20.), Some(rstr!("")), Some(rstr!("Separation")), separation_val, 0., 100.);
+        alignment_val = d.gui_slider(Rectangle::new(0., 80., 200., 20.), Some(rstr!("")), Some(rstr!("Alignment")), alignment_val, 0., 1.);
+        observation_range = d.gui_slider(Rectangle::new(0., 100., 200., 20.), Some(rstr!("")), Some(rstr!("Observation Range")), observation_range, 0., 100.);
     }
 }
