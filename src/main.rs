@@ -47,13 +47,15 @@ fn population_step(boid_pop: Vec<Boid>, sim_params: &SimulationParameters) -> Ve
         // Iterate over all other boid_pop 
         for b2 in &boid_pop {
             if b1 != b2 {
-                let distance = f32::powf(f32::powf(b2.pos.x - b1.pos.x, 2.) + f32::powf(b2.pos.y - b1.pos.y, 2.), 0.5);
-                if distance < sim_params.protected_range {
-                    close_boid_position_difference += b1.pos - b2.pos;
-                } else if distance < sim_params.visual_range {
-                    neighbour_boid_positions += b2.pos;
-                    neighbour_boid_velocities += b2.vel;                    
-                    num_neighbours += 1.;
+                if b1.vel.dot(b2.vel) < (PI/3.) as f32 {
+                    let distance = f32::powf(f32::powf(b2.pos.x - b1.pos.x, 2.) + f32::powf(b2.pos.y - b1.pos.y, 2.), 0.5);
+                    if distance < sim_params.protected_range {
+                        close_boid_position_difference += b1.pos - b2.pos;
+                    } else if distance < sim_params.visual_range {
+                        neighbour_boid_positions += b2.pos;
+                        neighbour_boid_velocities += b2.vel;                    
+                        num_neighbours += 1.;
+                    }
                 }
             }
         }
