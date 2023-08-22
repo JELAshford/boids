@@ -41,8 +41,8 @@ fn population_step(boid_pop: Vec<Boid>, sim_params: &SimulationParameters) -> Ve
         // Store accumulators for neighbour behaviour 
         let mut num_neighbours: f32 = 0.;
         let mut close_boid_position_difference = Vector2::zero();
-        let mut neighbour_boid_average_position = Vector2::zero();
-        let mut neighbour_boid_average_velocity = Vector2::zero();
+        let mut neighbour_boid_positions = Vector2::zero();
+        let mut neighbour_boid_velocities = Vector2::zero();
 
         // Iterate over all other boid_pop 
         for b2 in &boid_pop {
@@ -51,53 +51,60 @@ fn population_step(boid_pop: Vec<Boid>, sim_params: &SimulationParameters) -> Ve
                 if distance < sim_params.protected_range {
                     close_boid_position_difference += b1.pos - b2.pos;
                 } else if distance < sim_params.visual_range {
-                    neighbour_boid_average_position += b2.pos;
-                    neighbour_boid_average_velocity += b2.vel;                    
+                    neighbour_boid_positions += b2.pos;
+                    neighbour_boid_velocities += b2.vel;                    
                     num_neighbours += 1.;
                 }
             }
         }
         
-        if num_neighbours > 0. {
-
-            neighbour_boid_average_position /= num_neighbours;
-            neighbour_boid_average_velocity /= num_neighbours;
-
-            // Create rule velocities
-            let separation_vel = close_boid_position_difference * sim_params.separation_factor;
-            let alignment_vel = (neighbour_boid_average_velocity - b1.vel) * sim_params.alignment_factor;
-            let cohesion_vel = (neighbour_boid_average_position - b1.pos) * sim_params.cohesion_factor;
-            let mut new_vel = new_boids[i1].vel + separation_vel + alignment_vel + cohesion_vel;
-            
-            // Edge-avoidance velocity
-            if b1.pos.x > sim_params.width * 0.95 {
-                new_vel.x -= sim_params.turn_factor;
-            }
-            if b1.pos.x < sim_params.width * 0.05 {
-                new_vel.x += sim_params.turn_factor;
-            }
-            if b1.pos.y > sim_params.height * 0.95 {
-                new_vel.y -= sim_params.turn_factor;
-            }
-            if b1.pos.y < sim_params.height * 0.05 {
-                new_vel.y += sim_params.turn_factor;
-            }
-
-            // Speed Check
-            let new_speed = new_vel.length();
-            if new_speed < sim_params.speed_min {
-                new_vel = (new_vel / new_speed) * sim_params.speed_min;
-            }
-            if new_speed > sim_params.speed_max {
-                new_vel = (new_vel / new_speed) * sim_params.speed_max;
-            }
-            new_boids[i1].vel = new_vel;
-        }
+        let mut new_vel = new_boids[i1].vel.clone();
         
-        // Update positions
+        // Include neighbour effects on velocity
+        if num_neighbours > 0. {
+            let separation_vel = close_boid_position_difference * sim_params.separation_factor;
+            let alignment_vel = ((neighbour_boid_velocities / num_neighbours) - b1.vel) * sim_params.alignment_factor;
+            let cohesion_vel = ((neighbour_boid_positions / num_neighbours) - b1.pos) * sim_params.cohesion_factor;
+            new_vel += separation_vel + alignment_vel + cohesion_vel;
+        }
+
+        // Edge-avoidance velocity
+        if b1.pos.x > sim_params.width * 0.95 {
+            new_vel.x -= sim_params.turn_factor;
+        }
+        if b1.pos.x < sim_params.width * 0.05 {
+            new_vel.x += sim_params.turn_factor;
+        }
+        if b1.pos.y > sim_params.height * 0.95 {
+            new_vel.y -= sim_params.turn_factor;
+        }
+        if b1.pos.y < sim_params.height * 0.05 {
+            new_vel.y += sim_params.turn_factor;
+        }
+
+        // Speed Check
+        let new_speed = new_vel.length();
+        if new_speed < sim_params.speed_min {
+            new_vel = (new_vel / new_speed) * sim_params.speed_min;
+        }
+        if new_speed > sim_params.speed_max {
+            new_vel = (new_vel / new_speed) * sim_params.speed_max;
+        }
+
+        // Update boid states
+        new_boids[i1].vel = new_vel;
         new_boids[i1].pos = new_boids[i1].pos + new_boids[i1].vel;
     };
     new_boids
+}
+
+fn rotate2d(vec: Vector2, angle: f32) -> Vector2 {
+    let mut new_vec = vec.clone();
+    let cos_a = angle.cos();
+    let sin_a = angle.sin();
+    new_vec.x = vec.x * cos_a - vec.y * sin_a;
+    new_vec.y = vec.x * sin_a + vec.y * cos_a;
+    return new_vec
 }
 
 fn main() {
@@ -106,15 +113,15 @@ fn main() {
     let mut params = SimulationParameters{
         width: 600., 
         height: 600.,
-        num_boids: 1000, 
+        num_boids: 500, 
         speed_max: 5., 
         speed_min: 1., 
         visual_range: 20., 
         protected_range: 10., 
-        cohesion_factor: 0.0001, 
+        cohesion_factor: 0.0002, 
         alignment_factor: 0.02, 
         separation_factor: 0.01,
-        turn_factor: 0.05,
+        turn_factor: 0.1,
         show_ranges: false
     };
 
@@ -128,7 +135,7 @@ fn main() {
         .build();
 
     // Run display loop
-    // rl.set_target_fps(60);
+    rl.set_target_fps(60);
     while !rl.window_should_close() {
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
@@ -148,7 +155,14 @@ fn main() {
             // let vel_color: Color = Color::BLUE;
             // let vel_color: Color = rcolor(0, 0, ((b.vel.length()/(params.speed_max * 0.5))*255.) as u8, 255);
             let vel_color: Color = rcolor((((b.vel.x.abs() + params.speed_min)/(params.speed_max * 0.5))*255.) as u8, 0, (((b.vel.y.abs() + params.speed_min)/(params.speed_max * 0.5))*255.) as u8, 255);
-            d.draw_circle(b.pos.x as i32, b.pos.y as i32, 5., vel_color);
+            let direction = b.vel.normalized();
+            let angle = (PI/3.) as f32;
+            d.draw_triangle_lines(
+                b.pos + direction * 10.,
+                b.pos + rotate2d(direction * 2., angle), 
+                b.pos + rotate2d(direction * 2., -angle), 
+                vel_color
+            )
         }
 
         // User Interface
