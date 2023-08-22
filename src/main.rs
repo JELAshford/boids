@@ -47,21 +47,19 @@ fn population_step(boid_pop: Vec<Boid>, sim_params: &SimulationParameters) -> Ve
 
         // Iterate over all other boid_pop 
         for b2 in &boid_pop {
-            if b1 != b2 {
-                if b1.vel.dot(b2.vel) < sim_params.view_angle {
-                    let distance = f32::powf(f32::powf(b2.pos.x - b1.pos.x, 2.) + f32::powf(b2.pos.y - b1.pos.y, 2.), 0.5);
-                    if distance < sim_params.protected_range {
-                        close_boid_position_difference += b1.pos - b2.pos;
-                    } else if distance < sim_params.visual_range {
-                        neighbour_boid_positions += b2.pos;
-                        neighbour_boid_velocities += b2.vel;                    
-                        num_neighbours += 1.;
-                    }
+            if b1 != b2 && b1.vel.dot(b2.vel) < sim_params.view_angle{
+                let distance = f32::powf(f32::powf(b2.pos.x - b1.pos.x, 2.) + f32::powf(b2.pos.y - b1.pos.y, 2.), 0.5);
+                if distance < sim_params.protected_range {
+                    close_boid_position_difference += b1.pos - b2.pos;
+                } else if distance < sim_params.visual_range {
+                    neighbour_boid_positions += b2.pos;
+                    neighbour_boid_velocities += b2.vel;                    
+                    num_neighbours += 1.;
                 }
             }
         }
         
-        let mut new_vel = new_boids[i1].vel.clone();
+        let mut new_vel = new_boids[i1].vel;
         
         // Include neighbour effects on velocity
         if num_neighbours > 0. {
@@ -102,12 +100,12 @@ fn population_step(boid_pop: Vec<Boid>, sim_params: &SimulationParameters) -> Ve
 }
 
 fn rotate2d(vec: Vector2, angle: f32) -> Vector2 {
-    let mut new_vec = vec.clone();
+    let mut new_vec = vec;
     let cos_a = angle.cos();
     let sin_a = angle.sin();
     new_vec.x = vec.x * cos_a - vec.y * sin_a;
     new_vec.y = vec.x * sin_a + vec.y * cos_a;
-    return new_vec
+    new_vec
 }
 
 fn main() {
