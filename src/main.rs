@@ -152,8 +152,6 @@ fn main() {
             }
         }
         for b in &boids {
-            // let vel_color: Color = Color::BLUE;
-            // let vel_color: Color = rcolor(0, 0, ((b.vel.length()/(params.speed_max * 0.5))*255.) as u8, 255);
             let vel_color: Color = rcolor((((b.vel.x.abs() + params.speed_min)/(params.speed_max * 0.5))*255.) as u8, 0, (((b.vel.y.abs() + params.speed_min)/(params.speed_max * 0.5))*255.) as u8, 255);
             let direction = b.vel.normalized();
             let angle = (PI/3.) as f32;
