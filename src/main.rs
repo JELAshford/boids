@@ -106,10 +106,10 @@ fn main() {
     let mut params = SimulationParameters{
         width: 600., 
         height: 600.,
-        num_boids: 500, 
+        num_boids: 1000, 
         speed_max: 5., 
         speed_min: 1., 
-        visual_range: 50., 
+        visual_range: 20., 
         protected_range: 10., 
         cohesion_factor: 0.0001, 
         alignment_factor: 0.02, 
@@ -128,11 +128,11 @@ fn main() {
         .build();
 
     // Run display loop
-    rl.set_target_fps(60);
+    // rl.set_target_fps(60);
     while !rl.window_should_close() {
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
-        d.draw_fps(0, 0);
+        d.draw_fps((params.width-30.) as i32, 0);
 
         // Update population
         boids = population_step(boids, &params);
@@ -140,24 +140,27 @@ fn main() {
         // Visualise boids
         if params.show_ranges {
             for b in &boids {
-                d.draw_circle_lines(b.pos.x as i32, b.pos.y as i32, params.visual_range, Color::SKYBLUE);
-                d.draw_circle_lines(b.pos.x as i32, b.pos.y as i32, params.protected_range, Color::RED);
+                d.draw_circle_lines(b.pos.x as i32, b.pos.y as i32, params.visual_range, Color::WHITE);
+                d.draw_circle_lines(b.pos.x as i32, b.pos.y as i32, params.protected_range, Color::GRAY);
             }
         }
         for b in &boids {
-            d.draw_circle(b.pos.x as i32, b.pos.y as i32, 5., Color::BLUE);
+            // let vel_color: Color = Color::BLUE;
+            // let vel_color: Color = rcolor(0, 0, ((b.vel.length()/(params.speed_max * 0.5))*255.) as u8, 255);
+            let vel_color: Color = rcolor((((b.vel.x.abs() + params.speed_min)/(params.speed_max * 0.5))*255.) as u8, 0, (((b.vel.y.abs() + params.speed_min)/(params.speed_max * 0.5))*255.) as u8, 255);
+            d.draw_circle(b.pos.x as i32, b.pos.y as i32, 5., vel_color);
         }
 
         // User Interface
-        let should_quit = d.gui_button(Rectangle::new(0., 20., 50., 20.), Some(rstr!("Quit")));
+        let should_quit = d.gui_button(Rectangle::new(0., 0., 50., 20.), Some(rstr!("Quit")));
         if should_quit { break };
     
-        let should_reset = d.gui_button(Rectangle::new(50., 20., 50., 20.), Some(rstr!("Reset")));
+        let should_reset = d.gui_button(Rectangle::new(50., 0., 50., 20.), Some(rstr!("Reset")));
         if should_reset {
             boids = setup_random_boids(&params, &mut rng);
         }
 
-        params.show_ranges = d.gui_toggle(Rectangle::new(100., 20., 75., 20.), Some(rstr!("Show Ranges")), params.show_ranges);
+        params.show_ranges = d.gui_toggle(Rectangle::new(100., 0., 75., 20.), Some(rstr!("Show Ranges")), params.show_ranges);
         
         // cohesion_val = d.gui_slider(Rectangle::new(0., 40., 200., 20.), Some(rstr!("")), Some(rstr!("Cohesion")), cohesion_val, 0., 100.);
         // separation_val = d.gui_slider(Rectangle::new(0., 60., 200., 20.), Some(rstr!("")), Some(rstr!("Separation")), separation_val, 0., 100.);
