@@ -8,52 +8,93 @@ struct Boid {
     vel: Vector2,
 }
 
+struct SimulationParameters {
+    width: f32, 
+    height: f32,
+    num_boids: usize,
+    speed_max: f32,
+    speed_min: f32,
+    visual_range: f32,
+    protected_range: f32,
+    cohesion_factor: f32,
+    alignment_factor: f32,
+    separation_factor: f32,
+    turn_factor: f32,
+    show_ranges: bool
+}
 
-fn setup_random_boids(num_boids: usize, rng_obj: &mut ThreadRng) -> Vec<Boid> {
-    (0..=num_boids).map(|_| {
+
+fn setup_random_boids(sim_params: &SimulationParameters, rng_obj: &mut ThreadRng) -> Vec<Boid> {
+    (0..=sim_params.num_boids).map(|_| {
         Boid {
-            pos: Vector2::from(rng_obj.gen::<(f32, f32)>()) * 600., 
-            vel: (Vector2::from(rng_obj.gen::<(f32, f32)>()) * 10.) - 5.
+            pos: Vector2::from(rng_obj.gen::<(f32, f32)>()) * (sim_params.width * 0.9) + (sim_params.width * 0.05), 
+            vel: (Vector2::from(rng_obj.gen::<(f32, f32)>()) * sim_params.speed_max) - (sim_params.speed_max/2.)
         }
     }).collect()
 }
 
-fn population_step(boid_pop: Vec<Boid>, obs_range: f32, vel_limit: f32, cohesion: f32, separation: f32, alignment: f32) -> Vec<Boid> {
+fn population_step(boid_pop: Vec<Boid>, sim_params: &SimulationParameters) -> Vec<Boid> {
     let mut new_boids: Vec<Boid> = boid_pop.clone();
 
     for (i1, b1) in boid_pop.iter().enumerate() {
         // Store accumulators for neighbour behaviour 
         let mut num_neighbours: f32 = 0.;
-        let mut neighbour_centre_of_mass: Vector2 = Vector2::zero();
-        let mut neighbour_displacements: Vector2 = Vector2::zero();
-        let mut neighbour_velocities: Vector2 = Vector2::zero();
+        let mut close_boid_position_difference = Vector2::zero();
+        let mut neighbour_boid_average_position = Vector2::zero();
+        let mut neighbour_boid_average_velocity = Vector2::zero();
 
         // Iterate over all other boid_pop 
         for b2 in &boid_pop {
             if b1 != b2 {
                 let distance = f32::powf(f32::powf(b2.pos.x - b1.pos.x, 2.) + f32::powf(b2.pos.y - b1.pos.y, 2.), 0.5);
-                if distance < obs_range {
+                if distance < sim_params.protected_range {
+                    close_boid_position_difference += b1.pos - b2.pos;
+                } else if distance < sim_params.visual_range {
+                    neighbour_boid_average_position += b2.pos;
+                    neighbour_boid_average_velocity += b2.vel;                    
                     num_neighbours += 1.;
-                    neighbour_centre_of_mass = neighbour_centre_of_mass + b2.pos.clone(); // Cohesion
-                    neighbour_displacements = neighbour_displacements - (b2.pos.clone() - b1.pos.clone()); // Separation 
-                    neighbour_velocities = neighbour_velocities + b2.vel.clone(); // Alignment 
                 }
             }
         }
         
-        // Update velocity
         if num_neighbours > 0. {
-            let v1: Vector2 = ((neighbour_centre_of_mass/num_neighbours) - b1.pos.clone()) / cohesion; // Cohesion
-            let v2: Vector2 = neighbour_displacements/separation; // Separation 
-            let v3: Vector2 = ((neighbour_velocities/num_neighbours) - b1.vel.clone()) / alignment; // Alignment 
-            new_boids[i1].vel = new_boids[i1].vel.clone() + v1 + v2 + v3;
-            new_boids[i1].vel = new_boids[i1].vel.clone().clamp(-vel_limit, vel_limit);
+
+            neighbour_boid_average_position /= num_neighbours;
+            neighbour_boid_average_velocity /= num_neighbours;
+
+            // Create rule velocities
+            let separation_vel = close_boid_position_difference * sim_params.separation_factor;
+            let alignment_vel = (neighbour_boid_average_velocity - b1.vel) * sim_params.alignment_factor;
+            let cohesion_vel = (neighbour_boid_average_position - b1.pos) * sim_params.cohesion_factor;
+            let mut new_vel = new_boids[i1].vel + separation_vel + alignment_vel + cohesion_vel;
+            
+            // Edge-avoidance velocity
+            if b1.pos.x > sim_params.width * 0.95 {
+                new_vel.x -= sim_params.turn_factor;
+            }
+            if b1.pos.x < sim_params.width * 0.05 {
+                new_vel.x += sim_params.turn_factor;
+            }
+            if b1.pos.y > sim_params.height * 0.95 {
+                new_vel.y -= sim_params.turn_factor;
+            }
+            if b1.pos.y < sim_params.height * 0.05 {
+                new_vel.y += sim_params.turn_factor;
+            }
+
+            // Speed Check
+            let new_speed = new_vel.length();
+            if new_speed < sim_params.speed_min {
+                new_vel = (new_vel / new_speed) * sim_params.speed_min;
+            }
+            if new_speed > sim_params.speed_max {
+                new_vel = (new_vel / new_speed) * sim_params.speed_max;
+            }
+            new_boids[i1].vel = new_vel;
         }
         
         // Update positions
-        new_boids[i1].pos = new_boids[i1].pos.clone() + new_boids[i1].vel.clone();
-        new_boids[i1].pos.x = new_boids[i1].pos.clone().x%600.;
-        new_boids[i1].pos.y = new_boids[i1].pos.clone().y%600.;
+        new_boids[i1].pos = new_boids[i1].pos + new_boids[i1].vel;
     };
     new_boids
 }
@@ -61,19 +102,27 @@ fn population_step(boid_pop: Vec<Boid>, obs_range: f32, vel_limit: f32, cohesion
 fn main() {
 
     let mut rng: ThreadRng = rand::thread_rng();
-    let num_boids = 1000;
-    let velocity_limit = 10.;
-    let mut cohesion_val = 10.;
-    let mut separation_val = 50.;
-    let mut alignment_val = 1.;
-    let mut observation_range = 20.;
+    let mut params = SimulationParameters{
+        width: 600., 
+        height: 600.,
+        num_boids: 100, 
+        speed_max: 5., 
+        speed_min: 1., 
+        visual_range: 200., 
+        protected_range: 20., 
+        cohesion_factor: 0.0005, 
+        alignment_factor: 0.05, 
+        separation_factor: 0.05,
+        turn_factor: 0.2,
+        show_ranges: true
+    };
 
     // Create boid population
-    let mut boids = setup_random_boids(num_boids, &mut rng);
+    let mut boids = setup_random_boids(&params, &mut rng);
     
     // Setup raylib window
     let (mut rl, thread) = raylib::init()
-        .size(600, 600)
+        .size(params.width as i32, params.height as i32)
         .title("Boids Simulation")
         .build();
 
@@ -84,27 +133,34 @@ fn main() {
         d.clear_background(Color::BLACK);
         d.draw_fps(0, 0);
 
-        boids = population_step(boids, observation_range, velocity_limit, cohesion_val, separation_val, alignment_val);
+        // Update population
+        boids = population_step(boids, &params);
 
-        for b in &boids {
-            d.draw_circle_lines(b.pos.x as i32, b.pos.y as i32, observation_range, Color::SKYBLUE);
+        // Visualise boids
+        if params.show_ranges {
+            for b in &boids {
+                d.draw_circle_lines(b.pos.x as i32, b.pos.y as i32, params.visual_range, Color::SKYBLUE);
+                d.draw_circle_lines(b.pos.x as i32, b.pos.y as i32, params.protected_range, Color::RED);
+            }
         }
         for b in &boids {
             d.draw_circle(b.pos.x as i32, b.pos.y as i32, 5., Color::BLUE);
         }
 
         // User Interface
-        let should_quit = d.gui_button(Rectangle::new(0., 20., 100., 20.), Some(rstr!("Quit")));
+        let should_quit = d.gui_button(Rectangle::new(0., 20., 50., 20.), Some(rstr!("Quit")));
         if should_quit { break };
     
-        let should_reset = d.gui_button(Rectangle::new(100., 20., 100., 20.), Some(rstr!("Reset")));
+        let should_reset = d.gui_button(Rectangle::new(50., 20., 50., 20.), Some(rstr!("Reset")));
         if should_reset {
-            boids = setup_random_boids(num_boids, &mut rng);
+            boids = setup_random_boids(&params, &mut rng);
         }
 
-        cohesion_val = d.gui_slider(Rectangle::new(0., 40., 200., 20.), Some(rstr!("")), Some(rstr!("Cohesion")), cohesion_val, 0., 100.);
-        separation_val = d.gui_slider(Rectangle::new(0., 60., 200., 20.), Some(rstr!("")), Some(rstr!("Separation")), separation_val, 0., 100.);
-        alignment_val = d.gui_slider(Rectangle::new(0., 80., 200., 20.), Some(rstr!("")), Some(rstr!("Alignment")), alignment_val, 0., 1.);
-        observation_range = d.gui_slider(Rectangle::new(0., 100., 200., 20.), Some(rstr!("")), Some(rstr!("Observation Range")), observation_range, 0., 100.);
+        params.show_ranges = d.gui_toggle(Rectangle::new(100., 20., 75., 20.), Some(rstr!("Show Ranges")), params.show_ranges);
+        
+        // cohesion_val = d.gui_slider(Rectangle::new(0., 40., 200., 20.), Some(rstr!("")), Some(rstr!("Cohesion")), cohesion_val, 0., 100.);
+        // separation_val = d.gui_slider(Rectangle::new(0., 60., 200., 20.), Some(rstr!("")), Some(rstr!("Separation")), separation_val, 0., 100.);
+        // alignment_val = d.gui_slider(Rectangle::new(0., 80., 200., 20.), Some(rstr!("")), Some(rstr!("Alignment")), alignment_val, 0., 1.);
+        // observation_range = d.gui_slider(Rectangle::new(0., 100., 200., 20.), Some(rstr!("")), Some(rstr!("Observation Range")), observation_range, 0., 100.);
     }
 }
