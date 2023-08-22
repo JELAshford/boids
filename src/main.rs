@@ -25,7 +25,6 @@ struct SimulationParameters {
     show_ranges: bool
 }
 
-
 fn setup_random_boids(sim_params: &SimulationParameters, rng_obj: &mut ThreadRng) -> Vec<Boid> {
     (0..sim_params.num_boids).map(|_| {
         Boid {
@@ -108,6 +107,10 @@ fn rotate2d(vec: Vector2, angle: f32) -> Vector2 {
     new_vec
 }
 
+fn scale_color(value: f32, params: &SimulationParameters) -> u8 {
+    (((value.abs() + params.speed_min)/(params.speed_max * 0.5))*255.) as u8
+}
+
 fn main() {
 
     let mut rng: ThreadRng = rand::thread_rng();
@@ -151,38 +154,38 @@ fn main() {
             for b in &boids {
                 unsafe {
                     let direction = atan2f(b.vel.x, b.vel.y).to_degrees();
-                    d.draw_line(b.pos.x as i32, b.pos.y as i32, (b.pos+b.vel*10.).x as i32, (b.pos+b.vel*10.).y as i32, Color::YELLOW);
-                    d.draw_circle_sector_lines(b.pos, params.visual_range, direction - params.view_angle.to_degrees(), direction + params.view_angle.to_degrees(), 0, Color::WHITE);    
-                    d.draw_circle_sector_lines(b.pos, params.protected_range, direction - params.view_angle.to_degrees(), direction + params.view_angle.to_degrees(), 0, Color::GRAY);    
+                    let angle = params.view_angle.to_degrees();
+                    d.draw_circle_sector_lines(b.pos, params.visual_range, direction - angle, direction + angle, 0, Color::WHITE);    
+                    d.draw_circle_sector_lines(b.pos, params.protected_range, direction - angle, direction + angle, 0, Color::GRAY);    
                 }
             }
         }
         for b in &boids {
-            let vel_color: Color = rcolor((((b.vel.x.abs() + params.speed_min)/(params.speed_max * 0.5))*255.) as u8, 0, (((b.vel.y.abs() + params.speed_min)/(params.speed_max * 0.5))*255.) as u8, 255);
-            let direction = b.vel.normalized();
+            let vel_color: Color = rcolor(scale_color(b.vel.x, &params), 0, scale_color(b.vel.y, &params), 255);
+            let direction_vec = b.vel.normalized();
             let angle = (PI/3.) as f32;
             d.draw_triangle_lines(
-                b.pos + direction * 10.,
-                b.pos + rotate2d(direction * 2., angle), 
-                b.pos + rotate2d(direction * 2., -angle), 
+                b.pos + direction_vec * 10.,
+                b.pos + rotate2d(direction_vec * 2., angle), 
+                b.pos + rotate2d(direction_vec * 2., -angle), 
                 vel_color
             )
         }
 
         // User Interface
-        let should_quit = d.gui_button(Rectangle::new(0., 0., 50., 20.), Some(rstr!("Quit")));
+        let should_quit = d.gui_button(rrect(params.width-175., params.height-20., 50., 20.), Some(rstr!("Quit")));
         if should_quit { break };
     
-        let should_reset = d.gui_button(Rectangle::new(50., 0., 50., 20.), Some(rstr!("Reset")));
+        let should_reset = d.gui_button(rrect(params.width-125., params.height-20., 50., 20.), Some(rstr!("Reset")));
         if should_reset {
             boids = setup_random_boids(&params, &mut rng);
         }
 
-        params.show_ranges = d.gui_toggle(Rectangle::new(100., 0., 75., 20.), Some(rstr!("Show Ranges")), params.show_ranges);
-        
-        // cohesion_val = d.gui_slider(Rectangle::new(0., 40., 200., 20.), Some(rstr!("")), Some(rstr!("Cohesion")), cohesion_val, 0., 100.);
-        // separation_val = d.gui_slider(Rectangle::new(0., 60., 200., 20.), Some(rstr!("")), Some(rstr!("Separation")), separation_val, 0., 100.);
-        // alignment_val = d.gui_slider(Rectangle::new(0., 80., 200., 20.), Some(rstr!("")), Some(rstr!("Alignment")), alignment_val, 0., 1.);
-        // observation_range = d.gui_slider(Rectangle::new(0., 100., 200., 20.), Some(rstr!("")), Some(rstr!("Observation Range")), observation_range, 0., 100.);
+        params.show_ranges = d.gui_toggle(rrect(params.width-75., params.height-20., 75., 20.), Some(rstr!("Show Ranges")), params.show_ranges);
+        params.visual_range = d.gui_slider(rrect(0., params.height-20., 200., 20.), Some(rstr!("")), Some(rstr!("Visual Range")), params.visual_range, 1., 100.);
+        params.protected_range = d.gui_slider(rrect(0., params.height-40., 200., 20.), Some(rstr!("")), Some(rstr!("Protected Range")), params.protected_range, 1., 100.);  
+        params.cohesion_factor = d.gui_slider(rrect(0., params.height-60., 200., 20.), Some(rstr!("")), Some(rstr!("Cohesion")), params.cohesion_factor, 0.0005, 0.001);
+        params.separation_factor = d.gui_slider(rrect(0., params.height-80., 200., 20.), Some(rstr!("")), Some(rstr!("Separation")), params.separation_factor, 0.01, 0.1);
+        params.alignment_factor = d.gui_slider(rrect(0., params.height-100., 200., 20.), Some(rstr!("")), Some(rstr!("Alignment")), params.alignment_factor, 0.01, 0.1);
     }
 }
