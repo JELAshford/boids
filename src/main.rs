@@ -114,15 +114,15 @@ fn main() {
 
     let mut rng: ThreadRng = rand::thread_rng();
     let mut params = SimulationParameters{
-        width: 600., 
-        height: 600.,
-        num_boids: 500, 
+        width: 800., 
+        height: 800.,
+        num_boids: 1500, 
         speed_max: 5., 
         speed_min: 1., 
-        visual_range: 20., 
-        protected_range: 10., 
+        visual_range: 30., 
+        protected_range: 5., 
         view_angle: ((2.*PI)/3.) as f32,
-        cohesion_factor: 0.0002, 
+        cohesion_factor: 0.0005, 
         alignment_factor: 0.02, 
         separation_factor: 0.01,
         turn_factor: 0.1,
