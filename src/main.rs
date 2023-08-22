@@ -1,6 +1,6 @@
 // https://people.ece.cornell.edu/land/courses/ece4760/labs/s2021/Boids/Boids.html
 // https://vergenet.net/~conrad/boids/pseudocode.html
-use raylib::prelude::*;
+use raylib::{prelude::*, ffi::atan2f};
 use rand::prelude::*;
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -17,6 +17,7 @@ struct SimulationParameters {
     speed_min: f32,
     visual_range: f32,
     protected_range: f32,
+    view_angle: f32,
     cohesion_factor: f32,
     alignment_factor: f32,
     separation_factor: f32,
@@ -26,7 +27,7 @@ struct SimulationParameters {
 
 
 fn setup_random_boids(sim_params: &SimulationParameters, rng_obj: &mut ThreadRng) -> Vec<Boid> {
-    (0..=sim_params.num_boids).map(|_| {
+    (0..sim_params.num_boids).map(|_| {
         Boid {
             pos: Vector2::from(rng_obj.gen::<(f32, f32)>()) * (sim_params.width * 0.9) + (sim_params.width * 0.05), 
             vel: (Vector2::from(rng_obj.gen::<(f32, f32)>()) * sim_params.speed_max) - (sim_params.speed_max/2.)
@@ -47,7 +48,7 @@ fn population_step(boid_pop: Vec<Boid>, sim_params: &SimulationParameters) -> Ve
         // Iterate over all other boid_pop 
         for b2 in &boid_pop {
             if b1 != b2 {
-                if b1.vel.dot(b2.vel) < (PI/3.) as f32 {
+                if b1.vel.dot(b2.vel) < sim_params.view_angle {
                     let distance = f32::powf(f32::powf(b2.pos.x - b1.pos.x, 2.) + f32::powf(b2.pos.y - b1.pos.y, 2.), 0.5);
                     if distance < sim_params.protected_range {
                         close_boid_position_difference += b1.pos - b2.pos;
@@ -120,6 +121,7 @@ fn main() {
         speed_min: 1., 
         visual_range: 20., 
         protected_range: 10., 
+        view_angle: ((2.*PI)/3.) as f32,
         cohesion_factor: 0.0002, 
         alignment_factor: 0.02, 
         separation_factor: 0.01,
@@ -149,8 +151,12 @@ fn main() {
         // Visualise boids
         if params.show_ranges {
             for b in &boids {
-                d.draw_circle_lines(b.pos.x as i32, b.pos.y as i32, params.visual_range, Color::WHITE);
-                d.draw_circle_lines(b.pos.x as i32, b.pos.y as i32, params.protected_range, Color::GRAY);
+                unsafe {
+                    let direction = atan2f(b.vel.x, b.vel.y).to_degrees();
+                    d.draw_line(b.pos.x as i32, b.pos.y as i32, (b.pos+b.vel*10.).x as i32, (b.pos+b.vel*10.).y as i32, Color::YELLOW);
+                    d.draw_circle_sector_lines(b.pos, params.visual_range, direction - params.view_angle.to_degrees(), direction + params.view_angle.to_degrees(), 0, Color::WHITE);    
+                    d.draw_circle_sector_lines(b.pos, params.protected_range, direction - params.view_angle.to_degrees(), direction + params.view_angle.to_degrees(), 0, Color::GRAY);    
+                }
             }
         }
         for b in &boids {
