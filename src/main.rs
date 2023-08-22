@@ -11,16 +11,12 @@ struct Boid {
 
 
 fn setup_random_boids(num_boids: usize, rng_obj: &mut ThreadRng) -> Vec<Boid> {
-    let mut boids: Vec<Boid> = Vec::with_capacity(num_boids);
-    for _ in 0..boids.capacity() {
-        boids.push(
-            Boid {
-                pos: Vector2::from(rng_obj.gen::<(f32, f32)>()) * 600., 
-                vel: (Vector2::from(rng_obj.gen::<(f32, f32)>()) * 10.) - 5.
-            }
-        );
-    }
-    boids
+    (0..=num_boids).map(|_| {
+        Boid {
+            pos: Vector2::from(rng_obj.gen::<(f32, f32)>()) * 600., 
+            vel: (Vector2::from(rng_obj.gen::<(f32, f32)>()) * 10.) - 5.
+        }
+    }).collect()
 }
 
 fn population_step(boid_pop: Vec<Boid>, obs_range: f32, vel_limit: f32, cohesion: f32, separation: f32, alignment: f32) -> Vec<Boid> {
@@ -66,7 +62,7 @@ fn population_step(boid_pop: Vec<Boid>, obs_range: f32, vel_limit: f32, cohesion
 fn main() {
 
     let mut rng: ThreadRng = rand::thread_rng();
-    const NUM_BOIDS: usize = 1000;
+    const NUM_BOIDS: usize = 10000;
     const VELOCITY_LIMIT: f32 = 10.;
 
     let mut cohesion_val = 10.;
