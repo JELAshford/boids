@@ -2,8 +2,9 @@
 // https://vergenet.net/~conrad/boids/pseudocode.html
 use rand::prelude::*;
 use raylib::{ffi::atan2f, prelude::*};
+use rayon::prelude::*;
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 struct Boid {
     pos: Vector2,
     vel: Vector2,
@@ -37,72 +38,72 @@ fn setup_random_boids(sim_params: &SimulationParameters, rng_obj: &mut ThreadRng
 }
 
 fn population_step(boid_pop: Vec<Boid>, sim_params: &SimulationParameters) -> Vec<Boid> {
-    let mut new_boids: Vec<Boid> = boid_pop.clone();
+    boid_pop
+        .par_iter()
+        .map(|b1| {
+            // Store accumulators for neighbour behaviour
+            let mut num_neighbours: f32 = 0.;
+            let mut close_boid_position_difference = Vector2::zero();
+            let mut neighbour_boid_positions = Vector2::zero();
+            let mut neighbour_boid_velocities = Vector2::zero();
 
-    for (i1, b1) in boid_pop.iter().enumerate() {
-        // Store accumulators for neighbour behaviour
-        let mut num_neighbours: f32 = 0.;
-        let mut close_boid_position_difference = Vector2::zero();
-        let mut neighbour_boid_positions = Vector2::zero();
-        let mut neighbour_boid_velocities = Vector2::zero();
-
-        // Iterate over all other boid_pop
-        for b2 in &boid_pop {
-            if b1 != b2 && b1.vel.dot(b2.vel) < sim_params.view_angle {
-                let distance = f32::powf(
-                    f32::powf(b2.pos.x - b1.pos.x, 2.) + f32::powf(b2.pos.y - b1.pos.y, 2.),
-                    0.5,
-                );
-                if distance < sim_params.protected_range {
-                    close_boid_position_difference += b1.pos - b2.pos;
-                } else if distance < sim_params.visual_range {
-                    neighbour_boid_positions += b2.pos;
-                    neighbour_boid_velocities += b2.vel;
-                    num_neighbours += 1.;
+            // Iterate over all other boid_pop
+            for b2 in &boid_pop {
+                if b1 != b2 && b1.vel.dot(b2.vel) < sim_params.view_angle {
+                    let distance = f32::powf(
+                        f32::powf(b2.pos.x - b1.pos.x, 2.) + f32::powf(b2.pos.y - b1.pos.y, 2.),
+                        0.5,
+                    );
+                    if distance < sim_params.protected_range {
+                        close_boid_position_difference += b1.pos - b2.pos;
+                    } else if distance < sim_params.visual_range {
+                        neighbour_boid_positions += b2.pos;
+                        neighbour_boid_velocities += b2.vel;
+                        num_neighbours += 1.;
+                    }
                 }
             }
-        }
 
-        let mut new_vel = new_boids[i1].vel;
+            let mut new_boid = b1.clone();
+            // Include neighbour effects on velocity
+            if num_neighbours > 0. {
+                let separation_vel = close_boid_position_difference * sim_params.separation_factor;
+                let alignment_vel = ((neighbour_boid_velocities / num_neighbours) - b1.vel)
+                    * sim_params.alignment_factor;
+                let cohesion_vel = ((neighbour_boid_positions / num_neighbours) - b1.pos)
+                    * sim_params.cohesion_factor;
+                new_boid.vel += separation_vel + alignment_vel + cohesion_vel;
+            }
 
-        // Include neighbour effects on velocity
-        if num_neighbours > 0. {
-            let separation_vel = close_boid_position_difference * sim_params.separation_factor;
-            let alignment_vel = ((neighbour_boid_velocities / num_neighbours) - b1.vel)
-                * sim_params.alignment_factor;
-            let cohesion_vel =
-                ((neighbour_boid_positions / num_neighbours) - b1.pos) * sim_params.cohesion_factor;
-            new_vel += separation_vel + alignment_vel + cohesion_vel;
-        }
+            // Edge-avoidance velocity
+            if new_boid.pos.x > sim_params.width * 0.95 {
+                new_boid.vel.x -= sim_params.turn_factor;
+            }
+            if new_boid.pos.x < sim_params.width * 0.05 {
+                new_boid.vel.x += sim_params.turn_factor;
+            }
+            if new_boid.pos.y > sim_params.height * 0.95 {
+                new_boid.vel.y -= sim_params.turn_factor;
+            }
+            if new_boid.pos.y < sim_params.height * 0.05 {
+                new_boid.vel.y += sim_params.turn_factor;
+            }
 
-        // Edge-avoidance velocity
-        if b1.pos.x > sim_params.width * 0.95 {
-            new_vel.x -= sim_params.turn_factor;
-        }
-        if b1.pos.x < sim_params.width * 0.05 {
-            new_vel.x += sim_params.turn_factor;
-        }
-        if b1.pos.y > sim_params.height * 0.95 {
-            new_vel.y -= sim_params.turn_factor;
-        }
-        if b1.pos.y < sim_params.height * 0.05 {
-            new_vel.y += sim_params.turn_factor;
-        }
+            // Speed Check
+            let new_speed = new_boid.vel.length();
+            if new_speed < sim_params.speed_min {
+                new_boid.vel = (new_boid.vel / new_speed) * sim_params.speed_min;
+            }
+            if new_speed > sim_params.speed_max {
+                new_boid.vel = (new_boid.vel / new_speed) * sim_params.speed_max;
+            }
 
-        // Speed Check
-        let new_speed = new_vel.length();
-        if new_speed < sim_params.speed_min {
-            new_vel = (new_vel / new_speed) * sim_params.speed_min;
-        }
-        if new_speed > sim_params.speed_max {
-            new_vel = (new_vel / new_speed) * sim_params.speed_max;
-        }
+            // Update boid states
+            new_boid.pos = new_boid.pos + new_boid.vel;
 
-        // Update boid states
-        new_boids[i1].vel = new_vel;
-        new_boids[i1].pos = new_boids[i1].pos + new_boids[i1].vel;
-    }
-    new_boids
+            new_boid
+        })
+        .collect()
 }
 
 fn rotate2d(vec: Vector2, angle: f32) -> Vector2 {
@@ -123,7 +124,7 @@ fn main() {
     let mut params = SimulationParameters {
         width: 800.,
         height: 800.,
-        num_boids: 1500,
+        num_boids: 3000,
         speed_max: 5.,
         speed_min: 1.,
         visual_range: 30.,
